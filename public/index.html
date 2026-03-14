@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M5 BOT</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            font-family: 'Segoe UI', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            padding: 20px;
+        }
+        .container {
+            background: #000;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 0 50px #0066ff;
+            max-width: 600px;
+            width: 100%;
+            border: 2px solid #0066ff;
+        }
+        h1 {
+            color: #0066ff;
+            text-align: center;
+            font-size: 48px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px #0066ff;
+        }
+        .status-card {
+            background: #1a1a1a;
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid #0066ff;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            font-weight: bold;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .active {
+            background: #003300;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+        }
+        .waiting {
+            background: #332600;
+            color: #ffaa00;
+            border: 2px solid #ffaa00;
+        }
+        #qr-container {
+            background: #1a1a1a;
+            padding: 30px;
+            border-radius: 15px;
+            border: 2px solid #0066ff;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .pairing-section {
+            background: #1a1a1a;
+            padding: 25px;
+            border-radius: 15px;
+            border: 2px solid #0066ff;
+            margin: 20px 0;
+        }
+        input {
+            width: 100%;
+            padding: 15px;
+            background: #000;
+            color: #fff;
+            border: 2px solid #0066ff;
+            border-radius: 10px;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        .btn {
+            width: 100%;
+            background: #0066ff;
+            color: #fff;
+            border: none;
+            padding: 15px;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 18px;
+            cursor: pointer;
+        }
+        .btn:hover {
+            background: #003399;
+        }
+        .code-display {
+            background: #000;
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #0066ff;
+            text-align: center;
+        }
+        .code-text {
+            font-size: 48px;
+            font-weight: bold;
+            color: #0066ff;
+            letter-spacing: 10px;
+            margin: 20px 0;
+        }
+        .footer {
+            margin-top: 20px;
+            text-align: center;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>M5 BOT</h1>
+        
+        <div class="status-card">
+            <h3>WhatsApp Users</h3>
+            <div style="font-size: 36px; color: #0066ff;" id="userCount">0</div>
+        </div>
+        
+        <div id="statusDisplay" class="status waiting">⏳ Loading...</div>
+        
+        <div id="qr-container">
+            <img id="qrImage" style="display: none; max-width: 300px;" alt="QR">
+            <div id="qrPlaceholder">Waiting for QR...</div>
+        </div>
+        
+        <div class="pairing-section">
+            <h3 style="color: #0066ff; margin-bottom: 20px;">🔐 PAIR WITH CODE</h3>
+            <input type="text" id="phoneInput" placeholder="2547XXXXXXXX">
+            <button class="btn" onclick="requestPairing()">GET CODE</button>
+            <div id="pairingResult"></div>
+        </div>
+        
+        <div class="footer">
+            <p id="uptime">Uptime: --</p>
+        </div>
+    </div>
+
+    <script>
+        async function requestPairing() {
+            const phone = document.getElementById('phoneInput').value.trim();
+            const result = document.getElementById('pairingResult');
+            
+            if (!phone) {
+                result.innerHTML = '<span style="color: #ff4444;">❌ Enter number</span>';
+                return;
+            }
+            
+            result.innerHTML = '<span style="color: #ffaa00;">⏳ Requesting...</span>';
+            
+            try {
+                const response = await fetch('/pair', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ phoneNumber: phone })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    result.innerHTML = '<span style="color: #00ff00;">✅ Check in 10s</span>';
+                    setTimeout(checkCode, 10000);
+                } else {
+                    result.innerHTML = `<span style="color: #ff4444;">❌ ${data.message}</span>`;
+                }
+            } catch {
+                result.innerHTML = '<span style="color: #ff4444;">❌ Failed</span>';
+            }
+        }
+        
+        async function checkCode() {
+            try {
+                const response = await fetch('/pairing-status');
+                const data = await response.json();
+                
+                if (data.pending?.code) {
+                    document.getElementById('pairingResult').innerHTML = `
+                        <div class="code-display">
+                            <span style="color: #00ff00;">✅ CODE READY</span>
+                            <div class="code-text">${data.pending.code}</div>
+                            <div>Enter in WhatsApp → Linked Devices</div>
+                        </div>
+                    `;
+                }
+            } catch {}
+        }
+        
+        async function updateStatus() {
+            try {
+                const response = await fetch('/status');
+                const data = await response.json();
+                
+                document.getElementById('userCount').textContent = data.whatsapp_users || 0;
+                
+                const uptime = data.uptime;
+                const hours = Math.floor(uptime / 3600);
+                const minutes = Math.floor((uptime % 3600) / 60);
+                document.getElementById('uptime').textContent = `Uptime: ${hours}h ${minutes}m`;
+                
+                const statusDiv = document.getElementById('statusDisplay');
+                if (data.status === 'active') {
+                    statusDiv.className = 'status active';
+                    statusDiv.textContent = '✅ Bot Active';
+                } else {
+                    statusDiv.className = 'status waiting';
+                    statusDiv.textContent = '⏳ Connecting...';
+                }
+            } catch {}
+        }
+        
+        async function updateQR() {
+            try {
+                const response = await fetch('/qr');
+                const data = await response.json();
+                
+                if (data.qr) {
+                    document.getElementById('qrImage').src = data.qr;
+                    document.getElementById('qrImage').style.display = 'block';
+                    document.getElementById('qrPlaceholder').style.display = 'none';
+                }
+            } catch {}
+        }
+        
+        setInterval(updateStatus, 2000);
+        setInterval(updateQR, 3000);
+        updateStatus();
+        updateQR();
+    </script>
+</body>
+</html>
