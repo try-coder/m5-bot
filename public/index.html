@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>M5 BOT</title>
+    <title>M5 BOT - WhatsApp Pairing</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -29,8 +29,13 @@
             color: #0066ff;
             text-align: center;
             font-size: 48px;
-            margin-bottom: 20px;
+            margin-bottom: 10px;
             text-shadow: 0 0 20px #0066ff;
+        }
+        .subtitle {
+            text-align: center;
+            color: #999;
+            margin-bottom: 30px;
         }
         .status-card {
             background: #1a1a1a;
@@ -65,12 +70,29 @@
             text-align: center;
             margin: 20px 0;
         }
+        #qr-image {
+            max-width: 300px;
+            width: 100%;
+            height: auto;
+        }
         .pairing-section {
             background: #1a1a1a;
             padding: 25px;
             border-radius: 15px;
             border: 2px solid #0066ff;
             margin: 20px 0;
+            animation: glow 2s infinite;
+        }
+        @keyframes glow {
+            0% { box-shadow: 0 0 10px #0066ff; }
+            50% { box-shadow: 0 0 30px #0066ff; }
+            100% { box-shadow: 0 0 10px #0066ff; }
+        }
+        .pairing-section h3 {
+            color: #0066ff;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 24px;
         }
         input {
             width: 100%;
@@ -79,22 +101,29 @@
             color: #fff;
             border: 2px solid #0066ff;
             border-radius: 10px;
-            font-size: 18px;
+            font-size: 16px;
             margin-bottom: 15px;
+        }
+        input:focus {
+            outline: none;
+            box-shadow: 0 0 20px #0066ff;
         }
         .btn {
             width: 100%;
             background: #0066ff;
-            color: #fff;
+            color: white;
             border: none;
             padding: 15px;
             border-radius: 10px;
             font-weight: bold;
-            font-size: 18px;
+            font-size: 16px;
             cursor: pointer;
+            transition: all 0.3s;
         }
         .btn:hover {
             background: #003399;
+            transform: scale(1.02);
+            box-shadow: 0 0 30px #0066ff;
         }
         .code-display {
             background: #000;
@@ -102,6 +131,7 @@
             border-radius: 10px;
             border: 2px solid #0066ff;
             text-align: center;
+            margin-top: 20px;
         }
         .code-text {
             font-size: 48px;
@@ -109,17 +139,36 @@
             color: #0066ff;
             letter-spacing: 10px;
             margin: 20px 0;
+            text-shadow: 0 0 20px #0066ff;
+        }
+        .instructions {
+            color: #999;
+            font-size: 14px;
+            line-height: 1.8;
+            margin: 15px 0;
+            text-align: left;
         }
         .footer {
             margin-top: 20px;
             text-align: center;
             color: #666;
         }
+        .error {
+            color: #ff4444;
+            margin-top: 10px;
+            text-align: center;
+        }
+        .success {
+            color: #00ff00;
+            margin-top: 10px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>M5 BOT</h1>
+        <div class="subtitle">⚡ BMW M5 WhatsApp Bot ⚡</div>
         
         <div class="status-card">
             <h3>WhatsApp Users</h3>
@@ -129,70 +178,142 @@
         <div id="statusDisplay" class="status waiting">⏳ Loading...</div>
         
         <div id="qr-container">
-            <img id="qrImage" style="display: none; max-width: 300px;" alt="QR">
-            <div id="qrPlaceholder">Waiting for QR...</div>
+            <img id="qrImage" style="display: none; max-width: 300px;" alt="QR Code">
+            <div id="qrPlaceholder" style="color: #999;">Waiting for QR code...</div>
         </div>
         
+        <!-- PAIRING SECTION - FIXED -->
         <div class="pairing-section">
-            <h3 style="color: #0066ff; margin-bottom: 20px;">🔐 PAIR WITH CODE</h3>
-            <input type="text" id="phoneInput" placeholder="2547XXXXXXXX">
-            <button class="btn" onclick="requestPairing()">GET CODE</button>
-            <div id="pairingResult"></div>
+            <h3>🔐 PAIR WITH CODE</h3>
+            <p style="color: #999; margin-bottom: 15px; text-align: center;">Enter your phone number to get a pairing code</p>
+            
+            <input type="text" 
+                   id="phoneInput" 
+                   placeholder="2547XXXXXXXX" 
+                   value="2547">
+            
+            <button class="btn" onclick="requestPairing()">
+                🔑 GET PAIRING CODE
+            </button>
+            
+            <div id="pairingResult" style="margin-top: 20px;"></div>
+            <div id="pairingError" class="error"></div>
         </div>
         
         <div class="footer">
             <p id="uptime">Uptime: --</p>
+            <p style="margin-top: 10px;">Commands: .menu to see all commands</p>
         </div>
     </div>
 
     <script>
+        // FIXED PAIRING FUNCTIONS
         async function requestPairing() {
-            const phone = document.getElementById('phoneInput').value.trim();
-            const result = document.getElementById('pairingResult');
+            const phoneInput = document.getElementById('phoneInput');
+            const resultDiv = document.getElementById('pairingResult');
+            const errorDiv = document.getElementById('pairingError');
+            let phone = phoneInput.value.trim();
+            
+            // Clear previous messages
+            errorDiv.innerHTML = '';
+            resultDiv.innerHTML = '';
             
             if (!phone) {
-                result.innerHTML = '<span style="color: #ff4444;">❌ Enter number</span>';
+                errorDiv.innerHTML = '❌ Please enter your phone number';
                 return;
             }
             
-            result.innerHTML = '<span style="color: #ffaa00;">⏳ Requesting...</span>';
+            // Clean phone number
+            let cleanPhone = phone.replace(/[^0-9]/g, '');
+            
+            // Validate phone number
+            if (cleanPhone.length < 9) {
+                errorDiv.innerHTML = '❌ Phone number too short';
+                return;
+            }
+            
+            // Format for display
+            if (!cleanPhone.startsWith('254')) {
+                if (cleanPhone.startsWith('0')) {
+                    cleanPhone = '254' + cleanPhone.slice(1);
+                } else {
+                    cleanPhone = '254' + cleanPhone;
+                }
+            }
+            
+            resultDiv.innerHTML = '<span style="color: #ffaa00;">⏳ Requesting pairing code...</span>';
             
             try {
                 const response = await fetch('/pair', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ phoneNumber: phone })
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ phoneNumber: cleanPhone })
                 });
+                
                 const data = await response.json();
                 
                 if (data.success) {
-                    result.innerHTML = '<span style="color: #00ff00;">✅ Check in 10s</span>';
-                    setTimeout(checkCode, 10000);
+                    resultDiv.innerHTML = '<span style="color: #00ff00;">✅ Pairing initiated! Code will appear in 10-20 seconds...</span>';
+                    
+                    // Start checking for the code
+                    setTimeout(checkPairingStatus, 5000);
+                    setTimeout(checkPairingStatus, 10000);
+                    setTimeout(checkPairingStatus, 15000);
+                    setTimeout(checkPairingStatus, 20000);
+                    setTimeout(checkPairingStatus, 25000);
+                    setTimeout(checkPairingStatus, 30000);
                 } else {
-                    result.innerHTML = `<span style="color: #ff4444;">❌ ${data.message}</span>`;
+                    resultDiv.innerHTML = `<span style="color: #ff4444;">❌ ${data.message}</span>`;
                 }
-            } catch {
-                result.innerHTML = '<span style="color: #ff4444;">❌ Failed</span>';
+            } catch (error) {
+                resultDiv.innerHTML = '<span style="color: #ff4444;">❌ Failed to connect to server</span>';
             }
         }
-        
-        async function checkCode() {
+
+        async function checkPairingStatus() {
             try {
                 const response = await fetch('/pairing-status');
                 const data = await response.json();
                 
-                if (data.pending?.code) {
+                if (data.pending && data.pending.code) {
+                    const code = data.pending.code;
                     document.getElementById('pairingResult').innerHTML = `
                         <div class="code-display">
-                            <span style="color: #00ff00;">✅ CODE READY</span>
-                            <div class="code-text">${data.pending.code}</div>
-                            <div>Enter in WhatsApp → Linked Devices</div>
+                            <span style="color: #00ff00;">✅ CODE READY!</span>
+                            <div class="code-text">${code}</div>
+                            <div class="instructions">
+                                <strong>How to connect:</strong><br>
+                                1️⃣ Open WhatsApp on your phone<br>
+                                2️⃣ Tap Menu (⋮) → Linked Devices<br>
+                                3️⃣ Tap "Link a Device"<br>
+                                4️⃣ Enter this code: <strong>${code}</strong>
+                            </div>
+                            <div style="margin-top: 15px; color: #ffaa00; font-size: 12px;">
+                                ⏱️ Code expires in 5 minutes
+                            </div>
                         </div>
                     `;
+                } else if (data.pending && data.pending.status === 'failed') {
+                    document.getElementById('pairingResult').innerHTML = `
+                        <span style="color: #ff4444;">❌ Pairing failed: ${data.pending.message || 'Unknown error'}</span>
+                    `;
                 }
-            } catch {}
+            } catch (error) {
+                console.error('Error checking status:', error);
+            }
         }
-        
+
+        // Auto-refresh status
+        setInterval(async () => {
+            const resultDiv = document.getElementById('pairingResult');
+            if (resultDiv.innerHTML.includes('initiated') || resultDiv.innerHTML.includes('waiting')) {
+                checkPairingStatus();
+            }
+        }, 5000);
+
+        // Update status
         async function updateStatus() {
             try {
                 const response = await fetch('/status');
@@ -203,34 +324,52 @@
                 const uptime = data.uptime;
                 const hours = Math.floor(uptime / 3600);
                 const minutes = Math.floor((uptime % 3600) / 60);
-                document.getElementById('uptime').textContent = `Uptime: ${hours}h ${minutes}m`;
+                const seconds = Math.floor(uptime % 60);
+                document.getElementById('uptime').textContent = `Uptime: ${hours}h ${minutes}m ${seconds}s`;
                 
                 const statusDiv = document.getElementById('statusDisplay');
                 if (data.status === 'active') {
                     statusDiv.className = 'status active';
-                    statusDiv.textContent = '✅ Bot Active';
+                    statusDiv.textContent = '✅ Bot Active - Connected';
+                } else if (data.status === 'waiting') {
+                    statusDiv.className = 'status waiting';
+                    statusDiv.textContent = '⏳ Waiting for QR scan...';
                 } else {
                     statusDiv.className = 'status waiting';
                     statusDiv.textContent = '⏳ Connecting...';
                 }
-            } catch {}
+            } catch (error) {
+                console.error('Error updating status:', error);
+            }
         }
-        
+
+        // Update QR
         async function updateQR() {
             try {
                 const response = await fetch('/qr');
                 const data = await response.json();
                 
+                const qrImage = document.getElementById('qrImage');
+                const qrPlaceholder = document.getElementById('qrPlaceholder');
+                
                 if (data.qr) {
-                    document.getElementById('qrImage').src = data.qr;
-                    document.getElementById('qrImage').style.display = 'block';
-                    document.getElementById('qrPlaceholder').style.display = 'none';
+                    qrImage.src = data.qr;
+                    qrImage.style.display = 'block';
+                    qrPlaceholder.style.display = 'none';
+                } else {
+                    qrImage.style.display = 'none';
+                    qrPlaceholder.style.display = 'block';
                 }
-            } catch {}
+            } catch (error) {
+                console.error('Error updating QR:', error);
+            }
         }
-        
+
+        // Auto-refresh
         setInterval(updateStatus, 2000);
         setInterval(updateQR, 3000);
+        
+        // Initial load
         updateStatus();
         updateQR();
     </script>
